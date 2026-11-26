@@ -34,6 +34,7 @@ interface AuthContextValue {
   signInWithGoogle: () => Promise<void>;
   signOutUser: () => Promise<void>;
   updateProgram: (program: string) => Promise<void>;
+  updateClassName: (className: string) => Promise<void>;
   accessDeniedEmail: string | null;
 }
 
@@ -246,6 +247,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateClassName = async (className: string) => {
+    if (!user) return;
+    const trimmed = className.trim().slice(0, 120);
+    if (!trimmed) return;
+    await updateDoc(doc(db, 'users', user.uid), {
+      className: trimmed,
+      updatedAt: serverTimestamp(),
+    });
+    setProfile((prev) => (prev ? { ...prev, className: trimmed } : prev));
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -260,6 +272,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signInWithGoogle,
         signOutUser,
         updateProgram,
+        updateClassName,
       }}
     >
       {children}
