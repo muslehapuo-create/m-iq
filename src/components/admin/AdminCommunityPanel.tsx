@@ -57,6 +57,12 @@ export function AdminCommunityPanel({
   const [adminGrants, setAdminGrants] = useState<AdminGrant[]>([]);
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [approvedStudents, setApprovedStudents] = useState<Array<{email:string;displayName:string;active:boolean}>>([]);
+  const [classList, setClassList] = useState<Array<{id:string;name:string;active:boolean}>>([]);
+  const [newStudentName, setNewStudentName] = useState('');
+  const [newStudentEmail, setNewStudentEmail] = useState('');
+  const [newClassName, setNewClassName] = useState('');
+  const [accessSaving, setAccessSaving] = useState(false);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -68,6 +74,12 @@ export function AdminCommunityPanel({
       (err) => handleFirestoreError(err, OperationType.LIST, 'users')
     );
 
+    const unsubApprovals = onSnapshot(collection(db, 'approvedStudents'), (snap) => {
+      setApprovedStudents(snap.docs.map((d) => d.data() as {email:string;displayName:string;active:boolean}));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'approvedStudents'));
+    const unsubClasses = onSnapshot(collection(db, 'classes'), (snap) => {
+      setClassList(snap.docs.map((d) => ({ ...(d.data() as {name:string;active:boolean}), id:d.id })));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'classes'));
     const unsubAdmins = onSnapshot(
       collection(db, 'admins'),
       (snap) => {
@@ -79,9 +91,36 @@ export function AdminCommunityPanel({
     return () => {
       unsubUsers();
       unsubAdmins();
+      unsubApprovals();
+      unsubClasses();
     };
   }, [isAdmin]);
 
+  const addApprovedStudent = async () => {
+    const email = newStudentEmail.trim().toLowerCase();
+    const displayName = newStudentName.trim();
+    if (!user || !displayName || !email.includes('@') || !email.includes('.')) { window.alert('Masukkan nama dan e-mel yang sah.'); return; }
+    setAccessSaving(true);
+    try {
+      await setDoc(doc(db, 'approvedStudents', email), { email, displayName, active:true, createdAt:serverTimestamp(), updatedAt:serverTimestamp(), addedBy:user.uid });
+      setNewStudentName(''); setNewStudentEmail('');
+    } catch (err) { handleFirestoreError(err, OperationType.WRITE, 'approvedStudents'); }
+    finally { setAccessSaving(false); }
+  };
+  const revokeStudent = async (email:string) => {
+    if (!window.confirm('Tarik balik akses M-IQ untuk '+email+'?')) return;
+    await updateDoc(doc(db, 'approvedStudents', email), { active:false, updatedAt:serverTimestamp() });
+  };
+  const addClass = async () => {
+    if (!user || !newClassName.trim()) return;
+    const name = newClassName.trim();
+    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0,100);
+    if (!id) return;
+    setAccessSaving(true);
+    try { await setDoc(doc(db, 'classes', id), { name, active:true, createdAt:serverTimestamp(), updatedAt:serverTimestamp(), createdBy:user.uid }); setNewClassName(''); }
+    catch (err) { handleFirestoreError(err, OperationType.WRITE, 'classes'); }
+    finally { setAccessSaving(false); }
+  };
   const handleReplySubmit = async (fb: StudentFeedback) => {
     const replyText = (replyDrafts[fb.id] ?? fb.adminReply ?? '').trim().slice(0, 2000);
     setSavingId(fb.id);
@@ -369,6 +408,26 @@ export function AdminCommunityPanel({
         )}
       </section>
 
+      <section className="rounded-xl bg-white border border-slate-200 overflow-hidden">
+        <div className="px-6 py-4 bg-[#F8F9FC] border-b border-slate-200">
+          <h2 className="text-base font-bold text-[#0F172A]">Pendaftaran Pelajar &amp; Pengurusan Kelas</h2>
+          <p className="text-xs text-slate-500 mt-1">Hanya e-mel yang diluluskan boleh mengakses M-IQ.</p>
+        </div>
+        <div className="p-5 grid lg:grid-cols-2 gap-6">
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold">Daftar akaun pelajar</h3>
+            <input value={newStudentName} onChange={(e)=>setNewStudentName(e.target.value)} placeholder="Nama penuh pelajar" className="w-full px-3 py-2 rounded-lg border text-sm" />
+            <input type="email" value={newStudentEmail} onChange={(e)=>setNewStudentEmail(e.target.value)} placeholder="Alamat Gmail pelajar" className="w-full px-3 py-2 rounded-lg border text-sm" />
+            <button type="button" disabled={accessSaving} onClick={()=>void addApprovedStudent()} className="px-4 py-2 rounded-lg bg-[#4C1D95] text-white text-xs font-semibold">Daftar / Aktifkan Akses</button>
+            {approvedStudents.map((s)=><div key={s.email} className="flex justify-between gap-2 border-b py-2 text-xs"><span>{s.displayName} · {s.email}</span>{s.active ? <button type="button" onClick={()=>void revokeStudent(s.email)} className="text-red-700 font-semibold">Tarik akses</button> : <span>Tidak aktif</span>}</div>)}
+          </div>
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold">Senarai kelas</h3>
+            <div className="flex gap-2"><input value={newClassName} onChange={(e)=>setNewClassName(e.target.value)} placeholder="Contoh: DKA 1A" className="min-w-0 flex-1 px-3 py-2 rounded-lg border text-sm" /><button type="button" disabled={accessSaving} onClick={()=>void addClass()} className="px-4 py-2 rounded-lg bg-[#0A1128] text-white text-xs font-semibold">Tambah</button></div>
+            {classList.map((cl)=><div key={cl.id} className="border-b py-2 text-sm">{cl.name} <span className="text-xs text-slate-400">{cl.active?'Aktif':'Tidak aktif'}</span></div>)}
+          </div>
+        </div>
+      </section>
       {/* Role Management & Users */}
       <section className="rounded-xl bg-white border border-slate-200 overflow-hidden">
         <div className="px-6 py-4 bg-[#F8F9FC] border-b border-slate-200 flex items-center justify-between">
