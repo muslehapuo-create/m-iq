@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Lora", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --color-navy-950: #0A1128;
+  --color-navy-900: #0F172A;
+  --color-navy-800: #1E293B;
+  --color-purple-900: #3B0764;
+  --color-purple-800: #4C1D95;
+  --color-purple-700: #5B21B6;
+  --color-gold-500: #C59B27;
+  --color-gold-400: #D4AF37;
+  --color-gold-100: #FAF3DC;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    scroll-behavior: smooth;
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Subtle Islamic contemporary geometric lattice pattern for accents */
+.bg-itqan-lattice {
+  background-image: radial-gradient(rgba(197, 155, 39, 0.16) 1px, transparent 1px),
+    radial-gradient(rgba(76, 29, 149, 0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: 0 0, 12px 12px;
+}

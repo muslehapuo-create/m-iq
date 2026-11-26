@@ -1,0 +1,474 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated student or administrator profile.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "displayName": { "type": "string", "maxLength": 120 },
+        "email": { "type": "string", "format": "email", "maxLength": 160 },
+        "photoURL": { "type": "string", "maxLength": 500 },
+        "role": { "type": "string", "enum": ["student", "admin"] },
+        "program": { "type": "string", "maxLength": 120 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "email", "photoURL", "role", "program", "createdAt", "updatedAt"]
+    },
+    "AdminGrant": {
+      "title": "AdminGrant",
+      "description": "Explicit administrator privilege record keyed by user UID.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "format": "email", "maxLength": 160 },
+        "grantedBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "grantedBy", "createdAt"]
+    },
+    "LearningModule": {
+      "title": "LearningModule",
+      "description": "Top-level navigation section or learning module in the M-IQ curriculum.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "slug": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "navOrder": { "type": "integer" },
+        "title": { "type": "string", "maxLength": 160 },
+        "subtitle": { "type": "string", "maxLength": 300 },
+        "sectionType": { "type": "string", "enum": ["dashboard", "learning", "checklist", "rubric", "reflection", "appointment", "feedback"] },
+        "status": { "type": "string", "enum": ["draft", "published"] },
+        "coverImageUrl": { "type": "string", "maxLength": 1000 },
+        "isCore": { "type": "boolean" },
+        "updatedBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "slug", "navOrder", "title", "subtitle", "sectionType", "status", "coverImageUrl", "isCore", "updatedBy", "createdAt", "updatedAt"]
+    },
+    "SubModule": {
+      "title": "SubModule",
+      "description": "Submodule nested under a main learning module.",
+      "type": "object",
+      "properties": {
+        "moduleId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "maxLength": 180 },
+        "description": { "type": "string", "maxLength": 400 },
+        "order": { "type": "integer" },
+        "status": { "type": "string", "enum": ["draft", "published"] },
+        "updatedBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["moduleId", "title", "description", "order", "status", "updatedBy", "createdAt", "updatedAt"]
+    },
+    "TopicContent": {
+      "title": "TopicContent",
+      "description": "Editable topic inside a learning module or submodule with rich typography, media, links, references, and draft/publish state.",
+      "type": "object",
+      "properties": {
+        "moduleId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "subModuleId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "summary": { "type": "string", "maxLength": 600 },
+        "order": { "type": "integer" },
+        "status": { "type": "string", "enum": ["draft", "published"] },
+        "content": { "type": "string", "maxLength": 100000 },
+        "style": { "type": "object" },
+        "youtubeUrls": { "type": "array" },
+        "externalLinks": { "type": "array" },
+        "attachments": { "type": "array" },
+        "referenceMaterials": { "type": "array" },
+        "updatedBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["moduleId", "title", "summary", "order", "status", "content", "style", "youtubeUrls", "externalLinks", "attachments", "updatedBy", "createdAt", "updatedAt"]
+    },
+    "LearningResource": {
+      "title": "LearningResource",
+      "description": "Shared student learning resource managed by administrators.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 200 },
+        "description": { "type": "string", "maxLength": 500 },
+        "moduleId": { "type": "string", "maxLength": 128 },
+        "resourceType": { "type": "string", "enum": ["document", "image", "video", "link"] },
+        "url": { "type": "string", "maxLength": 1000 },
+        "fileName": { "type": "string", "maxLength": 200 },
+        "storagePath": { "type": "string", "maxLength": 300 },
+        "status": { "type": "string", "enum": ["draft", "published"] },
+        "uploadedBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "description", "moduleId", "resourceType", "url", "fileName", "storagePath", "status", "uploadedBy", "createdAt", "updatedAt"]
+    },
+    "ChecklistItem": {
+      "title": "ChecklistItem",
+      "description": "Editable 5-phase Itqan practice checklist item.",
+      "type": "object",
+      "properties": {
+        "category": { "type": "string", "maxLength": 120 },
+        "title": { "type": "string", "maxLength": 240 },
+        "description": { "type": "string", "maxLength": 600 },
+        "order": { "type": "integer" },
+        "status": { "type": "string", "enum": ["draft", "published"] },
+        "updatedBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["category", "title", "description", "order", "status", "updatedBy", "createdAt", "updatedAt"]
+    },
+    "SelfAssessmentItem": {
+      "title": "SelfAssessmentItem",
+      "description": "Editable Likert-scale (1-5) self-assessment statement managed by administrators.",
+      "type": "object",
+      "properties": {
+        "category": { "type": "string", "maxLength": 120 },
+        "statement": { "type": "string", "maxLength": 400 },
+        "order": { "type": "integer" },
+        "status": { "type": "string", "enum": ["draft", "published"] },
+        "updatedBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["category", "statement", "order", "status", "updatedBy", "createdAt", "updatedAt"]
+    },
+    "AssessmentConfig": {
+      "title": "AssessmentConfig",
+      "description": "Administrator-configured scoring method and interpretation bands for self-assessment.",
+      "type": "object",
+      "properties": {
+        "scoringMethod": { "type": "string", "enum": ["percentage", "sum", "average"] },
+        "scaleMin": { "type": "integer" },
+        "scaleMax": { "type": "integer" },
+        "bands": { "type": "array" },
+        "updatedBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["scoringMethod", "scaleMin", "scaleMax", "bands", "updatedBy", "createdAt", "updatedAt"]
+    },
+    "RubricCriterion": {
+      "title": "RubricCriterion",
+      "description": "Editable rubric criterion in Rubrik Kualiti Tugasan.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 200 },
+        "weight": { "type": "integer" },
+        "order": { "type": "integer" },
+        "levels": { "type": "array" },
+        "status": { "type": "string", "enum": ["draft", "published"] },
+        "updatedBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "weight", "order", "levels", "status", "updatedBy", "createdAt", "updatedAt"]
+    },
+    "StudentProgress": {
+      "title": "StudentProgress",
+      "description": "Individual student completion, checklist, self-assessment, and rubric state.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "completedTopicIds": { "type": "array" },
+        "checkedChecklistIds": { "type": "array" },
+        "rubricSelections": { "type": "object" },
+        "selfAssessmentResponses": { "type": "object" },
+        "selfAssessmentScore": { "type": "number" },
+        "selfAssessmentMaxScore": { "type": "number" },
+        "selfAssessmentScorePct": { "type": "integer" },
+        "selfAssessmentBandLabel": { "type": "string", "maxLength": 120 },
+        "selfAssessmentInterpretation": { "type": "string", "maxLength": 500 },
+        "selfAssessmentSubmittedAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "completedTopicIds", "checkedChecklistIds", "rubricSelections", "updatedAt"]
+    },
+    "StudentReflection": {
+      "title": "StudentReflection",
+      "description": "Official i-Refleksi M-IQ student assignment reflection with guided answers, typography style, draft/completed status, and course/student metadata.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userName": { "type": "string", "maxLength": 120 },
+        "moduleId": { "type": "string", "maxLength": 128 },
+        "moduleTitle": { "type": "string", "maxLength": 160 },
+        "title": { "type": "string", "maxLength": 200 },
+        "assignmentTitle": { "type": "string", "maxLength": 200 },
+        "courseCode": { "type": "string", "maxLength": 60 },
+        "courseName": { "type": "string", "maxLength": 160 },
+        "studentRegNo": { "type": "string", "maxLength": 60 },
+        "program": { "type": "string", "maxLength": 120 },
+        "lecturerName": { "type": "string", "maxLength": 120 },
+        "status": { "type": "string", "enum": ["draft", "completed"] },
+        "style": { "type": "object" },
+        "guidedAnswers": { "type": "array" },
+        "body": { "type": "string", "maxLength": 10000 },
+        "strengths": { "type": "string", "maxLength": 3000 },
+        "weaknesses": { "type": "string", "maxLength": 3000 },
+        "improvements": { "type": "string", "maxLength": 3000 },
+        "itqanTakeaway": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userName", "moduleId", "moduleTitle", "title", "body", "itqanTakeaway", "createdAt", "updatedAt"]
+    },
+    "StudentActivity": {
+      "title": "StudentActivity",
+      "description": "Immutable timestamped student learning activity history event.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userName": { "type": "string", "maxLength": 120 },
+        "activityType": { "type": "string", "enum": ["topic", "checklist", "self_assessment", "rubric", "reflection", "appointment", "itemu", "feedback"] },
+        "title": { "type": "string", "maxLength": 200 },
+        "detail": { "type": "string", "maxLength": 400 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userName", "activityType", "title", "detail", "createdAt"]
+    },
+    "StudentFeedback": {
+      "title": "StudentFeedback",
+      "description": "Feedback submitted by a student and reviewed by administrators.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userName": { "type": "string", "maxLength": 120 },
+        "category": { "type": "string", "enum": ["modul", "antaramuka", "teknikal", "umum"] },
+        "rating": { "type": "integer" },
+        "message": { "type": "string", "maxLength": 3000 },
+        "adminReply": { "type": "string", "maxLength": 2000 },
+        "status": { "type": "string", "enum": ["new", "reviewed"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userName", "category", "rating", "message", "adminReply", "status", "createdAt", "updatedAt"]
+    },
+    "LecturerDirectory": {
+      "title": "LecturerDirectory",
+      "description": "Public non-PII directory of verified M-IQ Admin (Pensyarah) accounts selectable by students for i-Temu Pensyarah consultations.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "displayName": { "type": "string", "maxLength": 120 },
+        "title": { "type": "string", "maxLength": 120 },
+        "isPrimary": { "type": "boolean" },
+        "active": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "title", "isPrimary", "active", "updatedAt"]
+    },
+    "LecturerAppointment": {
+      "title": "LecturerAppointment",
+      "description": "Student consultation request and Admin (Pensyarah) review/outcome record for i-Temu Pensyarah.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "studentName": { "type": "string", "maxLength": 120 },
+        "studentEmail": { "type": "string", "maxLength": 160 },
+        "studentRegNo": { "type": "string", "maxLength": 60 },
+        "program": { "type": "string", "maxLength": 120 },
+        "lecturerUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "lecturerName": { "type": "string", "maxLength": 120 },
+        "courseCode": { "type": "string", "maxLength": 40 },
+        "courseName": { "type": "string", "maxLength": 160 },
+        "purpose": { "type": "string", "maxLength": 2000 },
+        "meetingMode": { "type": "string", "enum": ["bersemuka", "dalam_talian"] },
+        "preferredDate": { "type": "string", "maxLength": 20 },
+        "preferredTime": { "type": "string", "maxLength": 20 },
+        "proposedDate": { "type": "string", "maxLength": 20 },
+        "proposedTime": { "type": "string", "maxLength": 20 },
+        "status": { "type": "string", "enum": ["pending", "under_review", "approved", "rescheduled", "rejected", "completed", "cancelled"] },
+        "rejectionReason": { "type": "string", "maxLength": 1000 },
+        "lecturerFeedback": { "type": "string", "maxLength": 2000 },
+        "meetingLocationOrLink": { "type": "string", "maxLength": 500 },
+        "meetingOutcome": { "type": "string", "maxLength": 3000 },
+        "studentUnread": { "type": "boolean" },
+        "adminUnread": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "respondedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId",
+        "studentName",
+        "studentEmail",
+        "studentRegNo",
+        "program",
+        "lecturerUid",
+        "lecturerName",
+        "courseCode",
+        "courseName",
+        "purpose",
+        "meetingMode",
+        "preferredDate",
+        "preferredTime",
+        "proposedDate",
+        "proposedTime",
+        "status",
+        "rejectionReason",
+        "lecturerFeedback",
+        "meetingLocationOrLink",
+        "meetingOutcome",
+        "studentUnread",
+        "adminUnread",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ITemuRecord": {
+      "title": "ITemuRecord",
+      "description": "Academic communication and lecturer feedback record for i-TEMU M-IQ.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "studentName": { "type": "string", "maxLength": 120 },
+        "studentEmail": { "type": "string", "maxLength": 160 },
+        "studentRegNo": { "type": "string", "maxLength": 60 },
+        "program": { "type": "string", "maxLength": 120 },
+        "studentClass": { "type": "string", "maxLength": 60 },
+        "courseCode": { "type": "string", "maxLength": 40 },
+        "courseName": { "type": "string", "maxLength": 160 },
+        "assignmentTitle": { "type": "string", "maxLength": 200 },
+        "assignmentType": {
+          "type": "string",
+          "enum": ["tugasan_individu", "tugasan_berkumpulan", "projek", "pembentangan", "laporan", "kajian_penyelidikan", "lain_lain"]
+        },
+        "assignmentTypeOther": { "type": "string", "maxLength": 120 },
+        "targetSubmissionDate": { "type": "string", "maxLength": 20 },
+        "guidanceArea": { "type": "string", "maxLength": 500 },
+        "questionOrIssue": { "type": "string", "maxLength": 3000 },
+        "feedbackExplanation": { "type": "string", "maxLength": 3000 },
+        "attachments": { "type": "array" },
+        "lecturerUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "lecturerName": { "type": "string", "maxLength": 120 },
+        "status": {
+          "type": "string",
+          "enum": ["dihantar", "menunggu_maklum_balas", "sedang_disemak", "maklum_balas_diberikan", "selesai"]
+        },
+        "detailedFeedback": { "type": "string", "maxLength": 15000 },
+        "strengthsReview": { "type": "string", "maxLength": 8000 },
+        "weaknessesReview": { "type": "string", "maxLength": 8000 },
+        "improvementSuggestions": { "type": "string", "maxLength": 8000 },
+        "nextActionGuide": { "type": "string", "maxLength": 8000 },
+        "feedbackStyle": { "type": "object" },
+        "feedbackByUid": { "type": "string", "maxLength": 128 },
+        "feedbackByName": { "type": "string", "maxLength": 120 },
+        "studentFollowUpNote": { "type": "string", "maxLength": 3000 },
+        "studentUnread": { "type": "boolean" },
+        "adminUnread": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "feedbackAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId",
+        "studentName",
+        "studentEmail",
+        "studentRegNo",
+        "program",
+        "studentClass",
+        "courseCode",
+        "courseName",
+        "assignmentTitle",
+        "assignmentType",
+        "assignmentTypeOther",
+        "targetSubmissionDate",
+        "guidanceArea",
+        "questionOrIssue",
+        "feedbackExplanation",
+        "attachments",
+        "lecturerUid",
+        "lecturerName",
+        "status",
+        "detailedFeedback",
+        "strengthsReview",
+        "weaknessesReview",
+        "improvementSuggestions",
+        "nextActionGuide",
+        "feedbackStyle",
+        "feedbackByUid",
+        "feedbackByName",
+        "studentFollowUpNote",
+        "studentUnread",
+        "adminUnread",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User profiles protected by owner/admin access."
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/AdminGrant" },
+      "description": "Administrator privilege registry."
+    },
+    "/modules/{moduleId}": {
+      "schema": { "$ref": "#/entities/LearningModule" },
+      "description": "Curriculum modules and navigation sections."
+    },
+    "/submodules/{submoduleId}": {
+      "schema": { "$ref": "#/entities/SubModule" },
+      "description": "Submodules nested under main learning modules."
+    },
+    "/topics/{topicId}": {
+      "schema": { "$ref": "#/entities/TopicContent" },
+      "description": "Editable module topics with typography and media."
+    },
+    "/resources/{resourceId}": {
+      "schema": { "$ref": "#/entities/LearningResource" },
+      "description": "Managed student learning resources."
+    },
+    "/checklistItems/{itemId}": {
+      "schema": { "$ref": "#/entities/ChecklistItem" },
+      "description": "5-phase Itqan practice checklist items."
+    },
+    "/selfAssessmentItems/{itemId}": {
+      "schema": { "$ref": "#/entities/SelfAssessmentItem" },
+      "description": "Likert-scale (1-5) self-assessment statements."
+    },
+    "/assessmentConfigs/{configId}": {
+      "schema": { "$ref": "#/entities/AssessmentConfig" },
+      "description": "Admin-managed scoring and interpretation configuration."
+    },
+    "/rubricCriteria/{criterionId}": {
+      "schema": { "$ref": "#/entities/RubricCriterion" },
+      "description": "Rubrik Kualiti Tugasan assessment criteria."
+    },
+    "/studentProgress/{progressId}": {
+      "schema": { "$ref": "#/entities/StudentProgress" },
+      "description": "Student progress, checklist, self-assessment, and rubric state keyed by UID."
+    },
+    "/reflections/{reflectionId}": {
+      "schema": { "$ref": "#/entities/StudentReflection" },
+      "description": "Student personal reflections."
+    },
+    "/studentActivities/{activityId}": {
+      "schema": { "$ref": "#/entities/StudentActivity" },
+      "description": "Student learning activity history logs."
+    },
+    "/feedback/{feedbackId}": {
+      "schema": { "$ref": "#/entities/StudentFeedback" },
+      "description": "Student feedback submissions and admin responses."
+    },
+    "/lecturerDirectory/{lecturerId}": {
+      "schema": { "$ref": "#/entities/LecturerDirectory" },
+      "description": "Non-PII directory of verified M-IQ Admin (Pensyarah) accounts selectable by students."
+    },
+    "/appointments/{appointmentId}": {
+      "schema": { "$ref": "#/entities/LecturerAppointment" },
+      "description": "Legacy consultation request records retained without deletion."
+    },
+    "/itemuRecords/{recordId}": {
+      "schema": { "$ref": "#/entities/ITemuRecord" },
+      "description": "i-TEMU academic communication and lecturer feedback records between students and Admin (Pensyarah)."
+    }
+  }
+}

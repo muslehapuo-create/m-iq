@@ -1,0 +1,978 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Core Primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isVerified() && (
+        request.auth.token.email == 'muslehapuo@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'email', 'photoURL', 'role', 'program', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'role', 'program', 'createdAt', 'updatedAt'])
+        && isValidId(data.uid)
+        && data.displayName is string && data.displayName.size() <= 120
+        && data.email is string && data.email.size() <= 160
+        && data.photoURL is string && data.photoURL.size() <= 500
+        && data.role in ['student', 'admin']
+        && data.program is string && data.program.size() <= 120
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAdminGrant(data) {
+      return data.keys().hasAll(['uid', 'email', 'grantedBy', 'createdAt'])
+        && data.keys().hasOnly(['uid', 'email', 'grantedBy', 'createdAt'])
+        && isValidId(data.uid)
+        && data.email is string && data.email.size() <= 160
+        && data.grantedBy is string && data.grantedBy.size() <= 128
+        && data.createdAt is timestamp;
+    }
+
+    function isValidModule(data) {
+      return data.keys().hasAll(['id', 'slug', 'navOrder', 'title', 'subtitle', 'sectionType', 'status', 'coverImageUrl', 'isCore', 'updatedBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'slug', 'navOrder', 'title', 'subtitle', 'sectionType', 'status', 'coverImageUrl', 'isCore', 'updatedBy', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && isValidId(data.slug)
+        && data.navOrder is int && data.navOrder >= 1 && data.navOrder <= 200
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 160
+        && data.subtitle is string && data.subtitle.size() <= 300
+        && data.sectionType in ['dashboard', 'learning', 'checklist', 'rubric', 'reflection', 'appointment', 'feedback']
+        && data.status in ['draft', 'published']
+        && data.coverImageUrl is string && data.coverImageUrl.size() <= 1000
+        && data.isCore is bool
+        && data.updatedBy is string && data.updatedBy.size() <= 128
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidSubModule(data) {
+      return data.keys().hasAll(['moduleId', 'title', 'description', 'order', 'status', 'updatedBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['moduleId', 'title', 'description', 'order', 'status', 'updatedBy', 'createdAt', 'updatedAt'])
+        && isValidId(data.moduleId)
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 180
+        && data.description is string && data.description.size() <= 400
+        && data.order is int && data.order >= 0 && data.order <= 1000
+        && data.status in ['draft', 'published']
+        && data.updatedBy is string && data.updatedBy.size() <= 128
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTopicStyle(style) {
+      return style is map
+        && style.keys().hasAll(['fontFamily', 'fontSize', 'textColor', 'textAlign'])
+        && style.keys().hasOnly(['fontFamily', 'fontSize', 'textColor', 'backgroundColor', 'textAlign'])
+        && style.fontFamily in ['sans', 'serif', 'editorial', 'mono']
+        && style.fontSize in ['sm', 'base', 'lg', 'xl']
+        && style.textColor is string && style.textColor.size() == 7 && style.textColor.matches('^#[0-9a-fA-F]{6}$')
+        && (!('backgroundColor' in style) || (style.backgroundColor is string && (style.backgroundColor == 'transparent' || (style.backgroundColor.size() == 7 && style.backgroundColor.matches('^#[0-9a-fA-F]{6}$')))))
+        && style.textAlign in ['justify', 'left', 'center', 'right'];
+    }
+
+    function isValidTopic(data) {
+      return data.keys().hasAll(['moduleId', 'title', 'summary', 'order', 'status', 'content', 'style', 'youtubeUrls', 'externalLinks', 'attachments', 'updatedBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['moduleId', 'subModuleId', 'title', 'summary', 'order', 'status', 'content', 'style', 'youtubeUrls', 'externalLinks', 'attachments', 'referenceMaterials', 'updatedBy', 'createdAt', 'updatedAt'])
+        && isValidId(data.moduleId)
+        && (!('subModuleId' in data) || (data.subModuleId is string && data.subModuleId.size() <= 128))
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 200
+        && data.summary is string && data.summary.size() <= 600
+        && data.order is int && data.order >= 0 && data.order <= 1000
+        && data.status in ['draft', 'published']
+        && data.content is string && data.content.size() <= 100000
+        && isValidTopicStyle(data.style)
+        && data.youtubeUrls is list && data.youtubeUrls.size() <= 5
+        && (data.youtubeUrls.size() == 0 || (data.youtubeUrls[0] is string && data.youtubeUrls[0].size() <= 200))
+        && data.externalLinks is list && data.externalLinks.size() <= 10
+        && (data.externalLinks.size() == 0 || (data.externalLinks[0] is map && data.externalLinks[0].keys().hasOnly(['label', 'url'])))
+        && data.attachments is list && data.attachments.size() <= 10
+        && (data.attachments.size() == 0 || (data.attachments[0] is map && data.attachments[0].keys().hasOnly(['name', 'url', 'type', 'size'])))
+        && (!('referenceMaterials' in data) || (data.referenceMaterials is list && data.referenceMaterials.size() <= 15 && (data.referenceMaterials.size() == 0 || (data.referenceMaterials[0] is map && data.referenceMaterials[0].keys().hasOnly(['title', 'source', 'url'])))))
+        && data.updatedBy is string && data.updatedBy.size() <= 128
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidResource(data) {
+      return data.keys().hasAll(['title', 'description', 'moduleId', 'resourceType', 'url', 'fileName', 'storagePath', 'status', 'uploadedBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['title', 'description', 'moduleId', 'resourceType', 'url', 'fileName', 'storagePath', 'status', 'uploadedBy', 'createdAt', 'updatedAt'])
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 200
+        && data.description is string && data.description.size() <= 500
+        && data.moduleId is string && data.moduleId.size() <= 128
+        && data.resourceType in ['document', 'image', 'video', 'link']
+        && data.url is string && data.url.size() >= 1 && data.url.size() <= 1000
+        && data.fileName is string && data.fileName.size() <= 200
+        && data.storagePath is string && data.storagePath.size() <= 300
+        && data.status in ['draft', 'published']
+        && data.uploadedBy is string && data.uploadedBy.size() <= 128
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidChecklistItem(data) {
+      return data.keys().hasAll(['category', 'title', 'description', 'order', 'status', 'updatedBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['category', 'title', 'description', 'order', 'status', 'updatedBy', 'createdAt', 'updatedAt'])
+        && data.category is string && data.category.size() >= 1 && data.category.size() <= 120
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 240
+        && data.description is string && data.description.size() <= 600
+        && data.order is int && data.order >= 0 && data.order <= 500
+        && data.status in ['draft', 'published']
+        && data.updatedBy is string && data.updatedBy.size() <= 128
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidSelfAssessmentItem(data) {
+      return data.keys().hasAll(['category', 'statement', 'order', 'status', 'updatedBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['category', 'statement', 'order', 'status', 'updatedBy', 'createdAt', 'updatedAt'])
+        && data.category is string && data.category.size() >= 1 && data.category.size() <= 120
+        && data.statement is string && data.statement.size() >= 1 && data.statement.size() <= 400
+        && data.order is int && data.order >= 0 && data.order <= 500
+        && data.status in ['draft', 'published']
+        && data.updatedBy is string && data.updatedBy.size() <= 128
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAssessmentConfig(data) {
+      return data.keys().hasAll(['scoringMethod', 'scaleMin', 'scaleMax', 'bands', 'updatedBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['scoringMethod', 'scaleMin', 'scaleMax', 'bands', 'updatedBy', 'createdAt', 'updatedAt'])
+        && data.scoringMethod in ['percentage', 'sum', 'average']
+        && data.scaleMin is int && data.scaleMin >= 1 && data.scaleMin <= 5
+        && data.scaleMax is int && data.scaleMax >= data.scaleMin && data.scaleMax <= 10
+        && data.bands is list && data.bands.size() >= 1 && data.bands.size() <= 10
+        && data.bands[0] is map
+        && data.bands[0].keys().hasAll(['minScore', 'maxScore', 'label', 'description'])
+        && data.bands[0].keys().hasOnly(['minScore', 'maxScore', 'label', 'description'])
+        && data.bands[0].minScore is number
+        && data.bands[0].maxScore is number
+        && data.bands[0].label is string && data.bands[0].label.size() <= 120
+        && data.bands[0].description is string && data.bands[0].description.size() <= 500
+        && data.updatedBy is string && data.updatedBy.size() <= 128
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidRubricCriterion(data) {
+      return data.keys().hasAll(['title', 'weight', 'order', 'levels', 'status', 'updatedBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['title', 'weight', 'order', 'levels', 'status', 'updatedBy', 'createdAt', 'updatedAt'])
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 200
+        && data.weight is int && data.weight >= 1 && data.weight <= 100
+        && data.order is int && data.order >= 0 && data.order <= 200
+        && data.levels is list && data.levels.size() >= 1 && data.levels.size() <= 5
+        && (data.levels[0] is map && data.levels[0].keys().hasOnly(['label', 'score', 'description']))
+        && data.status in ['draft', 'published']
+        && data.updatedBy is string && data.updatedBy.size() <= 128
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidStudentProgress(data) {
+      return data.keys().hasAll(['userId', 'completedTopicIds', 'checkedChecklistIds', 'rubricSelections', 'updatedAt'])
+        && data.keys().hasOnly([
+          'userId',
+          'completedTopicIds',
+          'checkedChecklistIds',
+          'rubricSelections',
+          'selfAssessmentResponses',
+          'selfAssessmentScore',
+          'selfAssessmentMaxScore',
+          'selfAssessmentScorePct',
+          'selfAssessmentBandLabel',
+          'selfAssessmentInterpretation',
+          'selfAssessmentSubmittedAt',
+          'updatedAt'
+        ])
+        && isValidId(data.userId)
+        && data.completedTopicIds is list && data.completedTopicIds.size() <= 200
+        && (data.completedTopicIds.size() == 0 || (data.completedTopicIds[0] is string && data.completedTopicIds[0].size() <= 128))
+        && data.checkedChecklistIds is list && data.checkedChecklistIds.size() <= 200
+        && (data.checkedChecklistIds.size() == 0 || (data.checkedChecklistIds[0] is string && data.checkedChecklistIds[0].size() <= 128))
+        && data.rubricSelections is map && data.rubricSelections.size() <= 50
+        && (!('selfAssessmentResponses' in data) || (data.selfAssessmentResponses is map && data.selfAssessmentResponses.size() <= 100))
+        && (!('selfAssessmentScore' in data) || (data.selfAssessmentScore is number && data.selfAssessmentScore >= 0 && data.selfAssessmentScore <= 10000))
+        && (!('selfAssessmentMaxScore' in data) || (data.selfAssessmentMaxScore is number && data.selfAssessmentMaxScore >= 0 && data.selfAssessmentMaxScore <= 10000))
+        && (!('selfAssessmentScorePct' in data) || (data.selfAssessmentScorePct is int && data.selfAssessmentScorePct >= 0 && data.selfAssessmentScorePct <= 100))
+        && (!('selfAssessmentBandLabel' in data) || (data.selfAssessmentBandLabel is string && data.selfAssessmentBandLabel.size() <= 120))
+        && (!('selfAssessmentInterpretation' in data) || (data.selfAssessmentInterpretation is string && data.selfAssessmentInterpretation.size() <= 500))
+        && (!('selfAssessmentSubmittedAt' in data) || data.selfAssessmentSubmittedAt is timestamp)
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidReflection(data) {
+      return data.keys().hasAll(['userId', 'userName', 'moduleId', 'moduleTitle', 'title', 'body', 'itqanTakeaway', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly([
+          'userId',
+          'userName',
+          'moduleId',
+          'moduleTitle',
+          'title',
+          'assignmentTitle',
+          'courseCode',
+          'courseName',
+          'studentRegNo',
+          'program',
+          'lecturerName',
+          'status',
+          'style',
+          'guidedAnswers',
+          'body',
+          'strengths',
+          'weaknesses',
+          'improvements',
+          'itqanTakeaway',
+          'createdAt',
+          'updatedAt'
+        ])
+        && isValidId(data.userId)
+        && data.userName is string && data.userName.size() <= 120
+        && isValidId(data.moduleId)
+        && data.moduleTitle is string && data.moduleTitle.size() <= 160
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 200
+        && (!('assignmentTitle' in data) || (data.assignmentTitle is string && data.assignmentTitle.size() <= 200))
+        && (!('courseCode' in data) || (data.courseCode is string && data.courseCode.size() <= 60))
+        && (!('courseName' in data) || (data.courseName is string && data.courseName.size() <= 160))
+        && (!('studentRegNo' in data) || (data.studentRegNo is string && data.studentRegNo.size() <= 60))
+        && (!('program' in data) || (data.program is string && data.program.size() <= 120))
+        && (!('lecturerName' in data) || (data.lecturerName is string && data.lecturerName.size() <= 120))
+        && (!('status' in data) || data.status in ['draft', 'completed'])
+        && (!('style' in data) || isValidTopicStyle(data.style))
+        && (!('guidedAnswers' in data) || (
+          data.guidedAnswers is list
+          && data.guidedAnswers.size() <= 8
+          && (
+            data.guidedAnswers.size() == 0 || (
+              data.guidedAnswers[0] is map
+              && data.guidedAnswers[0].keys().hasAll(['id', 'prompt', 'answer'])
+              && data.guidedAnswers[0].keys().hasOnly(['id', 'prompt', 'answer'])
+              && data.guidedAnswers[0].id is string && data.guidedAnswers[0].id.size() <= 60
+              && data.guidedAnswers[0].prompt is string && data.guidedAnswers[0].prompt.size() <= 400
+              && data.guidedAnswers[0].answer is string && data.guidedAnswers[0].answer.size() <= 15000
+            )
+          )
+        ))
+        && data.body is string && data.body.size() >= 1 && data.body.size() <= 10000
+        && (!('strengths' in data) || (data.strengths is string && data.strengths.size() <= 3000))
+        && (!('weaknesses' in data) || (data.weaknesses is string && data.weaknesses.size() <= 3000))
+        && (!('improvements' in data) || (data.improvements is string && data.improvements.size() <= 3000))
+        && data.itqanTakeaway is string && data.itqanTakeaway.size() <= 1000
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidStudentActivity(data) {
+      return data.keys().hasAll(['userId', 'userName', 'activityType', 'title', 'detail', 'createdAt'])
+        && data.keys().hasOnly(['userId', 'userName', 'activityType', 'title', 'detail', 'createdAt'])
+        && isValidId(data.userId)
+        && data.userName is string && data.userName.size() <= 120
+        && data.activityType in ['topic', 'checklist', 'self_assessment', 'rubric', 'reflection', 'appointment', 'itemu', 'feedback']
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 200
+        && data.detail is string && data.detail.size() <= 400
+        && data.createdAt is timestamp;
+    }
+
+    function isValidFeedback(data) {
+      return data.keys().hasAll(['userId', 'userName', 'category', 'rating', 'message', 'adminReply', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['userId', 'userName', 'category', 'rating', 'message', 'adminReply', 'status', 'createdAt', 'updatedAt'])
+        && isValidId(data.userId)
+        && data.userName is string && data.userName.size() <= 120
+        && data.category in ['modul', 'antaramuka', 'teknikal', 'umum']
+        && data.rating is int && data.rating >= 1 && data.rating <= 5
+        && data.message is string && data.message.size() >= 1 && data.message.size() <= 3000
+        && data.adminReply is string && data.adminReply.size() <= 2000
+        && data.status in ['new', 'reviewed']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidLecturerDirectory(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'title', 'isPrimary', 'active', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'title', 'isPrimary', 'active', 'updatedAt'])
+        && isValidId(data.uid)
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120
+        && data.title is string && data.title.size() <= 120
+        && data.isPrimary is bool
+        && data.active is bool
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAppointment(data) {
+      return data.keys().hasAll([
+          'userId',
+          'studentName',
+          'studentEmail',
+          'studentRegNo',
+          'program',
+          'lecturerUid',
+          'lecturerName',
+          'courseCode',
+          'courseName',
+          'purpose',
+          'meetingMode',
+          'preferredDate',
+          'preferredTime',
+          'proposedDate',
+          'proposedTime',
+          'status',
+          'rejectionReason',
+          'lecturerFeedback',
+          'meetingLocationOrLink',
+          'meetingOutcome',
+          'studentUnread',
+          'adminUnread',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'userId',
+          'studentName',
+          'studentEmail',
+          'studentRegNo',
+          'program',
+          'lecturerUid',
+          'lecturerName',
+          'courseCode',
+          'courseName',
+          'purpose',
+          'meetingMode',
+          'preferredDate',
+          'preferredTime',
+          'proposedDate',
+          'proposedTime',
+          'status',
+          'rejectionReason',
+          'lecturerFeedback',
+          'meetingLocationOrLink',
+          'meetingOutcome',
+          'studentUnread',
+          'adminUnread',
+          'createdAt',
+          'updatedAt',
+          'respondedAt'
+        ])
+        && isValidId(data.userId)
+        && data.studentName is string && data.studentName.size() >= 1 && data.studentName.size() <= 120
+        && data.studentEmail is string && data.studentEmail.size() <= 160
+        && data.studentRegNo is string && data.studentRegNo.size() <= 60
+        && data.program is string && data.program.size() <= 120
+        && isValidId(data.lecturerUid)
+        && data.lecturerName is string && data.lecturerName.size() >= 1 && data.lecturerName.size() <= 120
+        && data.courseCode is string && data.courseCode.size() >= 1 && data.courseCode.size() <= 40
+        && data.courseName is string && data.courseName.size() >= 1 && data.courseName.size() <= 160
+        && data.purpose is string && data.purpose.size() >= 1 && data.purpose.size() <= 2000
+        && data.meetingMode in ['bersemuka', 'dalam_talian']
+        && data.preferredDate is string && data.preferredDate.size() >= 1 && data.preferredDate.size() <= 20
+        && data.preferredTime is string && data.preferredTime.size() >= 1 && data.preferredTime.size() <= 20
+        && data.proposedDate is string && data.proposedDate.size() <= 20
+        && data.proposedTime is string && data.proposedTime.size() <= 20
+        && data.status in ['pending', 'under_review', 'approved', 'rescheduled', 'rejected', 'completed', 'cancelled']
+        && data.rejectionReason is string && data.rejectionReason.size() <= 1000
+        && data.lecturerFeedback is string && data.lecturerFeedback.size() <= 2000
+        && data.meetingLocationOrLink is string && data.meetingLocationOrLink.size() <= 500
+        && data.meetingOutcome is string && data.meetingOutcome.size() <= 3000
+        && data.studentUnread is bool
+        && data.adminUnread is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp
+        && (!('respondedAt' in data) || data.respondedAt is timestamp);
+    }
+
+    function isValidITemuRecord(data) {
+      return data.keys().hasAll([
+          'userId',
+          'studentName',
+          'studentEmail',
+          'studentRegNo',
+          'program',
+          'studentClass',
+          'courseCode',
+          'courseName',
+          'assignmentTitle',
+          'assignmentType',
+          'assignmentTypeOther',
+          'targetSubmissionDate',
+          'guidanceArea',
+          'questionOrIssue',
+          'feedbackExplanation',
+          'attachments',
+          'lecturerUid',
+          'lecturerName',
+          'status',
+          'detailedFeedback',
+          'strengthsReview',
+          'weaknessesReview',
+          'improvementSuggestions',
+          'nextActionGuide',
+          'feedbackStyle',
+          'feedbackByUid',
+          'feedbackByName',
+          'studentFollowUpNote',
+          'studentUnread',
+          'adminUnread',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'userId',
+          'studentName',
+          'studentEmail',
+          'studentRegNo',
+          'program',
+          'studentClass',
+          'courseCode',
+          'courseName',
+          'assignmentTitle',
+          'assignmentType',
+          'assignmentTypeOther',
+          'targetSubmissionDate',
+          'guidanceArea',
+          'questionOrIssue',
+          'feedbackExplanation',
+          'attachments',
+          'lecturerUid',
+          'lecturerName',
+          'status',
+          'detailedFeedback',
+          'strengthsReview',
+          'weaknessesReview',
+          'improvementSuggestions',
+          'nextActionGuide',
+          'feedbackStyle',
+          'feedbackByUid',
+          'feedbackByName',
+          'studentFollowUpNote',
+          'studentUnread',
+          'adminUnread',
+          'createdAt',
+          'updatedAt',
+          'feedbackAt'
+        ])
+        && isValidId(data.userId)
+        && data.studentName is string && data.studentName.size() >= 1 && data.studentName.size() <= 120
+        && data.studentEmail is string && data.studentEmail.size() <= 160
+        && data.studentRegNo is string && data.studentRegNo.size() <= 60
+        && data.program is string && data.program.size() <= 120
+        && data.studentClass is string && data.studentClass.size() <= 60
+        && data.courseCode is string && data.courseCode.size() >= 1 && data.courseCode.size() <= 40
+        && data.courseName is string && data.courseName.size() >= 1 && data.courseName.size() <= 160
+        && data.assignmentTitle is string && data.assignmentTitle.size() >= 1 && data.assignmentTitle.size() <= 200
+        && data.assignmentType in ['tugasan_individu', 'tugasan_berkumpulan', 'projek', 'pembentangan', 'laporan', 'kajian_penyelidikan', 'lain_lain']
+        && data.assignmentTypeOther is string && data.assignmentTypeOther.size() <= 120
+        && data.targetSubmissionDate is string && data.targetSubmissionDate.size() <= 20
+        && data.guidanceArea is string && data.guidanceArea.size() >= 1 && data.guidanceArea.size() <= 500
+        && data.questionOrIssue is string && data.questionOrIssue.size() >= 1 && data.questionOrIssue.size() <= 3000
+        && data.feedbackExplanation is string && data.feedbackExplanation.size() <= 3000
+        && data.attachments is list && data.attachments.size() <= 5
+        && (data.attachments.size() == 0 || (
+          data.attachments[0] is map
+          && data.attachments[0].keys().hasOnly(['name', 'url', 'storagePath', 'type', 'size'])
+        ))
+        && isValidId(data.lecturerUid)
+        && data.lecturerName is string && data.lecturerName.size() >= 1 && data.lecturerName.size() <= 120
+        && data.status in ['dihantar', 'menunggu_maklum_balas', 'sedang_disemak', 'maklum_balas_diberikan', 'selesai']
+        && data.detailedFeedback is string && data.detailedFeedback.size() <= 15000
+        && data.strengthsReview is string && data.strengthsReview.size() <= 8000
+        && data.weaknessesReview is string && data.weaknessesReview.size() <= 8000
+        && data.improvementSuggestions is string && data.improvementSuggestions.size() <= 8000
+        && data.nextActionGuide is string && data.nextActionGuide.size() <= 8000
+        && isValidTopicStyle(data.feedbackStyle)
+        && data.feedbackByUid is string && data.feedbackByUid.size() <= 128
+        && data.feedbackByName is string && data.feedbackByName.size() <= 120
+        && data.studentFollowUpNote is string && data.studentFollowUpNote.size() <= 3000
+        && data.studentUnread is bool
+        && data.adminUnread is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp
+        && (!('feedbackAt' in data) || data.feedbackAt is timestamp);
+    }
+
+    // Users Collection (PII isolated to owner or admin)
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isVerified()
+        && isValidId(userId)
+        && isOwner(userId)
+        && isValidUser(incoming())
+        && incoming().uid == request.auth.uid
+        && incoming().role == 'student'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified()
+        && isValidId(userId)
+        && isValidUser(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (isOwner(userId) && incoming().role == existing().role && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'program', 'updatedAt']))
+        );
+      allow delete: if isValidId(userId) && isAdmin();
+    }
+
+    // Explicit Admin Registry
+    match /admins/{adminId} {
+      allow get: if isValidId(adminId) && (isOwner(adminId) || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isAdmin() && isValidId(adminId) && isValidAdminGrant(incoming()) && incoming().uid == adminId && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isAdmin() && isValidId(adminId);
+    }
+
+    // Modules Collection
+    match /modules/{moduleId} {
+      allow get: if isValidId(moduleId) && (isAdmin() || (isSignedIn() && existing().status == 'published'));
+      allow list: if isAdmin() || (isSignedIn() && existing().status == 'published');
+      allow create: if isAdmin()
+        && isValidId(moduleId)
+        && isValidModule(incoming())
+        && incoming().id == moduleId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isAdmin()
+        && isValidId(moduleId)
+        && isValidModule(incoming())
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time;
+      allow delete: if isAdmin() && isValidId(moduleId);
+    }
+
+    // SubModules Collection
+    match /submodules/{submoduleId} {
+      allow get: if isValidId(submoduleId) && (isAdmin() || (isSignedIn() && existing().status == 'published'));
+      allow list: if isAdmin() || (isSignedIn() && existing().status == 'published');
+      allow create: if isAdmin()
+        && isValidId(submoduleId)
+        && isValidSubModule(incoming())
+        && exists(/databases/$(database)/documents/modules/$(incoming().moduleId))
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isAdmin()
+        && isValidId(submoduleId)
+        && isValidSubModule(incoming())
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time;
+      allow delete: if isAdmin() && isValidId(submoduleId);
+    }
+
+    // Topics Collection
+    match /topics/{topicId} {
+      allow get: if isValidId(topicId) && (isAdmin() || (isSignedIn() && existing().status == 'published'));
+      allow list: if isAdmin() || (isSignedIn() && existing().status == 'published');
+      allow create: if isAdmin()
+        && isValidId(topicId)
+        && isValidTopic(incoming())
+        && exists(/databases/$(database)/documents/modules/$(incoming().moduleId))
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isAdmin()
+        && isValidId(topicId)
+        && isValidTopic(incoming())
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time;
+      allow delete: if isAdmin() && isValidId(topicId);
+    }
+
+    // Learning Resources Collection
+    match /resources/{resourceId} {
+      allow get: if isValidId(resourceId) && (isAdmin() || (isSignedIn() && existing().status == 'published'));
+      allow list: if isAdmin() || (isSignedIn() && existing().status == 'published');
+      allow create: if isAdmin()
+        && isValidId(resourceId)
+        && isValidResource(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isAdmin()
+        && isValidId(resourceId)
+        && isValidResource(incoming())
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time;
+      allow delete: if isAdmin() && isValidId(resourceId);
+    }
+
+    // Checklist Items Collection (Senarai Semak Amalan Itqan 5 Fasa)
+    match /checklistItems/{itemId} {
+      allow get: if isValidId(itemId) && (isAdmin() || (isSignedIn() && existing().status == 'published'));
+      allow list: if isAdmin() || (isSignedIn() && existing().status == 'published');
+      allow create: if isAdmin()
+        && isValidId(itemId)
+        && isValidChecklistItem(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isAdmin()
+        && isValidId(itemId)
+        && isValidChecklistItem(incoming())
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time;
+      allow delete: if isAdmin() && isValidId(itemId);
+    }
+
+    // Self-Assessment Statements Collection (Skala Likert 1-5)
+    match /selfAssessmentItems/{itemId} {
+      allow get: if isValidId(itemId) && (isAdmin() || (isSignedIn() && existing().status == 'published'));
+      allow list: if isAdmin() || (isSignedIn() && existing().status == 'published');
+      allow create: if isAdmin()
+        && isValidId(itemId)
+        && isValidSelfAssessmentItem(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isAdmin()
+        && isValidId(itemId)
+        && isValidSelfAssessmentItem(incoming())
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time;
+      allow delete: if isAdmin() && isValidId(itemId);
+    }
+
+    // Assessment Scoring Configuration (Admin-managed)
+    match /assessmentConfigs/{configId} {
+      allow get: if isValidId(configId) && isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isAdmin()
+        && isValidId(configId)
+        && isValidAssessmentConfig(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isAdmin()
+        && isValidId(configId)
+        && isValidAssessmentConfig(incoming())
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time;
+      allow delete: if isAdmin() && isValidId(configId);
+    }
+
+    // Rubric Criteria Collection (Rubrik Kualiti Tugasan)
+    match /rubricCriteria/{criterionId} {
+      allow get: if isValidId(criterionId) && (isAdmin() || (isSignedIn() && existing().status == 'published'));
+      allow list: if isAdmin() || (isSignedIn() && existing().status == 'published');
+      allow create: if isAdmin()
+        && isValidId(criterionId)
+        && isValidRubricCriterion(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isAdmin()
+        && isValidId(criterionId)
+        && isValidRubricCriterion(incoming())
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time;
+      allow delete: if isAdmin() && isValidId(criterionId);
+    }
+
+    // Student Progress Collection
+    match /studentProgress/{progressId} {
+      allow get: if isValidId(progressId) && (isOwner(progressId) || isAdmin());
+      allow list: if isAdmin() || (isSignedIn() && existing().userId == request.auth.uid);
+      allow create: if isVerified()
+        && isValidId(progressId)
+        && isOwner(progressId)
+        && isValidStudentProgress(incoming())
+        && incoming().userId == request.auth.uid
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified()
+        && isValidId(progressId)
+        && isValidStudentProgress(incoming())
+        && incoming().userId == existing().userId
+        && incoming().updatedAt == request.time
+        && (isOwner(progressId) || isAdmin());
+      allow delete: if isAdmin() && isValidId(progressId);
+    }
+
+    // Student Reflections Collection
+    match /reflections/{reflectionId} {
+      allow get: if isValidId(reflectionId) && isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow create: if isVerified()
+        && isValidId(reflectionId)
+        && isValidReflection(incoming())
+        && incoming().userId == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified()
+        && isValidId(reflectionId)
+        && isValidReflection(incoming())
+        && existing().userId == request.auth.uid
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'userName',
+          'moduleId',
+          'moduleTitle',
+          'title',
+          'assignmentTitle',
+          'courseCode',
+          'courseName',
+          'studentRegNo',
+          'program',
+          'lecturerName',
+          'status',
+          'style',
+          'guidedAnswers',
+          'body',
+          'strengths',
+          'weaknesses',
+          'improvements',
+          'itqanTakeaway',
+          'updatedAt'
+        ]);
+      allow delete: if isValidId(reflectionId) && isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+    }
+
+    // Student Learning Activity History (Immutable log per user)
+    match /studentActivities/{activityId} {
+      allow get: if isValidId(activityId) && isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow create: if isVerified()
+        && isValidId(activityId)
+        && isValidStudentActivity(incoming())
+        && incoming().userId == request.auth.uid
+        && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isValidId(activityId) && isAdmin();
+    }
+
+    // Student Feedback Collection
+    match /feedback/{feedbackId} {
+      allow get: if isValidId(feedbackId) && isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow create: if isVerified()
+        && isValidId(feedbackId)
+        && isValidFeedback(incoming())
+        && incoming().userId == request.auth.uid
+        && incoming().adminReply == ''
+        && incoming().status == 'new'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isAdmin()
+        && isValidId(feedbackId)
+        && isValidFeedback(incoming())
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['adminReply', 'status', 'updatedAt']);
+      allow delete: if isValidId(feedbackId) && (isAdmin() || (isSignedIn() && existing().userId == request.auth.uid));
+    }
+
+    // Non-PII Admin (Pensyarah) Directory for Student i-Temu Selection
+    match /lecturerDirectory/{lecturerId} {
+      allow get: if isValidId(lecturerId) && isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isAdmin()
+        && isValidId(lecturerId)
+        && isValidLecturerDirectory(incoming())
+        && incoming().uid == lecturerId
+        && incoming().updatedAt == request.time;
+      allow update: if isAdmin()
+        && isValidId(lecturerId)
+        && isValidLecturerDirectory(incoming())
+        && incoming().uid == existing().uid
+        && incoming().updatedAt == request.time;
+      allow delete: if isAdmin() && isValidId(lecturerId);
+    }
+
+    // i-Temu Pensyarah Consultation Appointments
+    match /appointments/{appointmentId} {
+      allow get: if isValidId(appointmentId) && isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow create: if isVerified()
+        && isValidId(appointmentId)
+        && isValidAppointment(incoming())
+        && incoming().userId == request.auth.uid
+        && incoming().status == 'pending'
+        && incoming().proposedDate == ''
+        && incoming().proposedTime == ''
+        && incoming().rejectionReason == ''
+        && incoming().lecturerFeedback == ''
+        && incoming().meetingLocationOrLink == ''
+        && incoming().meetingOutcome == ''
+        && incoming().studentUnread == false
+        && incoming().adminUnread == true
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && !('respondedAt' in incoming());
+      allow update: if isVerified()
+        && isValidId(appointmentId)
+        && isValidAppointment(incoming())
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (
+            isAdmin()
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'lecturerUid',
+              'lecturerName',
+              'proposedDate',
+              'proposedTime',
+              'status',
+              'rejectionReason',
+              'lecturerFeedback',
+              'meetingLocationOrLink',
+              'meetingOutcome',
+              'studentUnread',
+              'adminUnread',
+              'respondedAt',
+              'updatedAt'
+            ])
+          )
+          ||
+          (
+            existing().userId == request.auth.uid
+            && (
+              (
+                incoming().studentUnread == false
+                && incoming().diff(existing()).affectedKeys().hasOnly(['studentUnread', 'updatedAt'])
+              )
+              ||
+              (
+                existing().status == 'rescheduled'
+                && incoming().status == 'approved'
+                && incoming().preferredDate == existing().proposedDate
+                && incoming().preferredTime == existing().proposedTime
+                && incoming().studentUnread == false
+                && incoming().adminUnread == true
+                && incoming().diff(existing()).affectedKeys().hasOnly([
+                  'preferredDate',
+                  'preferredTime',
+                  'status',
+                  'studentUnread',
+                  'adminUnread',
+                  'updatedAt'
+                ])
+              )
+              ||
+              (
+                existing().status in ['pending', 'under_review', 'rescheduled']
+                && incoming().status == 'cancelled'
+                && incoming().studentUnread == false
+                && incoming().adminUnread == true
+                && incoming().diff(existing()).affectedKeys().hasOnly([
+                  'status',
+                  'studentUnread',
+                  'adminUnread',
+                  'updatedAt'
+                ])
+              )
+            )
+          )
+        );
+      allow delete: if isValidId(appointmentId) && (
+        isAdmin() ||
+        (isSignedIn() && existing().userId == request.auth.uid && existing().status in ['pending', 'cancelled'])
+      );
+    }
+
+    // i-TEMU Academic Communication & Lecturer Feedback Records
+    match /itemuRecords/{recordId} {
+      allow get: if isValidId(recordId) && isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow create: if isVerified()
+        && isValidId(recordId)
+        && isValidITemuRecord(incoming())
+        && incoming().userId == request.auth.uid
+        && incoming().status == 'dihantar'
+        && incoming().detailedFeedback == ''
+        && incoming().strengthsReview == ''
+        && incoming().weaknessesReview == ''
+        && incoming().improvementSuggestions == ''
+        && incoming().nextActionGuide == ''
+        && incoming().feedbackByUid == ''
+        && incoming().feedbackByName == ''
+        && incoming().studentFollowUpNote == ''
+        && incoming().studentUnread == false
+        && incoming().adminUnread == true
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && !('feedbackAt' in incoming());
+      allow update: if isVerified()
+        && isValidId(recordId)
+        && isValidITemuRecord(incoming())
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (
+            isAdmin()
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'lecturerUid',
+              'lecturerName',
+              'status',
+              'detailedFeedback',
+              'strengthsReview',
+              'weaknessesReview',
+              'improvementSuggestions',
+              'nextActionGuide',
+              'feedbackStyle',
+              'feedbackByUid',
+              'feedbackByName',
+              'studentUnread',
+              'adminUnread',
+              'feedbackAt',
+              'updatedAt'
+            ])
+          )
+          ||
+          (
+            existing().userId == request.auth.uid
+            && (
+              (
+                incoming().studentUnread == false
+                && incoming().diff(existing()).affectedKeys().hasOnly(['studentUnread', 'updatedAt'])
+              )
+              ||
+              (
+                existing().status in ['maklum_balas_diberikan', 'selesai']
+                && incoming().status in ['maklum_balas_diberikan', 'selesai']
+                && incoming().studentUnread == false
+                && incoming().adminUnread == true
+                && incoming().diff(existing()).affectedKeys().hasOnly([
+                  'studentFollowUpNote',
+                  'status',
+                  'studentUnread',
+                  'adminUnread',
+                  'updatedAt'
+                ])
+              )
+            )
+          )
+        );
+      allow delete: if isValidId(recordId) && (
+        isAdmin() ||
+        (isSignedIn() && existing().userId == request.auth.uid && existing().status == 'dihantar')
+      );
+    }
+  }
+}
