@@ -51,6 +51,7 @@ export interface UserProfile {
   role: UserRole;
   program: string;
   className?: string;
+  active?: boolean;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
