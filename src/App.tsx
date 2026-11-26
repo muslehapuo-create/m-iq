@@ -87,7 +87,7 @@ function MiqWorkspace() {
     return <SignInGateway />;
   }
 
-  if (user && !isAdmin && profile && !profile.className) {
+  if (user && !isAdmin && profile && profile.onboardingComplete !== true) {
     return <StudentClassSetup />;
   }
 
