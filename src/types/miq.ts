@@ -52,6 +52,7 @@ export interface UserProfile {
   program: string;
   className?: string;
   active?: boolean;
+  onboardingComplete?: boolean;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
