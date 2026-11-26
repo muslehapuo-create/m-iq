@@ -81,20 +81,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const resolvedAdmin = Boolean(isPrimaryAdmin || adminGrantExists);
         const safeEmail = (firebaseUser.email || '').trim().toLowerCase().slice(0, 160);
 
-        if (!resolvedAdmin) {
-          if (!firebaseUser.emailVerified || !safeEmail) {
-            setAccessDeniedEmail(firebaseUser.email || 'Akaun Google tidak disahkan');
-            setProfile(null);
-            setIsAdmin(false);
-            return;
-          }
-          const approvalSnap = await getDoc(doc(db, 'approvedStudents', safeEmail));
-          if (!approvalSnap.exists() || approvalSnap.data().active !== true) {
-            setAccessDeniedEmail(safeEmail);
-            setProfile(null);
-            setIsAdmin(false);
-            return;
-          }
+        if (!firebaseUser.emailVerified || !safeEmail) {
+          setAccessDeniedEmail(firebaseUser.email || 'Akaun Google tidak disahkan');
+          setProfile(null);
+          setIsAdmin(false);
+          return;
         }
 
         setUser(firebaseUser);
@@ -120,6 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             photoURL: safePhoto,
             role: 'student' as const,
             program: 'Politeknik Malaysia',
+            active: true,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
           };
@@ -147,9 +139,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             photoURL: safePhoto,
             role: resolvedAdmin ? 'admin' : 'student',
             program: 'Politeknik Malaysia',
+            active: true,
           });
         } else {
           const data = userSnap.data() as UserProfile;
+          if (!resolvedAdmin && data.active === false) {
+            setUser(null);
+            setAccessDeniedEmail(safeEmail);
+            setProfile(null);
+            setIsAdmin(false);
+            return;
+          }
           if (resolvedAdmin && data.role !== 'admin') {
             try {
               await updateDoc(userRef, {
