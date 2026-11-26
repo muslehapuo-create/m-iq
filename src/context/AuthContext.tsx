@@ -35,6 +35,7 @@ interface AuthContextValue {
   signOutUser: () => Promise<void>;
   updateProgram: (program: string) => Promise<void>;
   updateClassName: (className: string) => Promise<void>;
+  completeStudentSetup: (displayName: string, className: string) => Promise<void>;
   accessDeniedEmail: string | null;
 }
 
@@ -258,6 +259,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile((prev) => (prev ? { ...prev, className: trimmed } : prev));
   };
 
+  const completeStudentSetup = async (displayName: string, className: string) => {
+    if (!user) return;
+    const name = displayName.trim().slice(0, 120);
+    const klass = className.trim().slice(0, 120);
+    if (!name || !klass) throw new Error('Nama dan kelas wajib diisi.');
+    await updateDoc(doc(db, 'users', user.uid), {
+      displayName: name,
+      className: klass,
+      onboardingComplete: true,
+      updatedAt: serverTimestamp(),
+    });
+    setProfile((prev) => (prev ? { ...prev, displayName: name, className: klass, onboardingComplete: true } : prev));
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -273,6 +288,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signOutUser,
         updateProgram,
         updateClassName,
+        completeStudentSetup,
       }}
     >
       {children}
