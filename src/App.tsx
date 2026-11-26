@@ -12,12 +12,13 @@ import { NavigationSidebar } from './components/NavigationSidebar';
 import { ReflectionView } from './components/ReflectionView';
 import { RubricView } from './components/RubricView';
 import { SignInGateway } from './components/SignInGateway';
+import { StudentClassSetup } from './components/StudentClassSetup';
 import { IRefleksiIcon } from './components/IRefleksiIcon';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useMiqData } from './hooks/useMiqData';
 
 function MiqWorkspace() {
-  const { user, isAdmin, authReady, accessDeniedEmail, signOutUser } = useAuth();
+  const { user, profile, isAdmin, authReady, accessDeniedEmail, signOutUser } = useAuth();
   const {
     modules,
     submodules,
@@ -84,6 +85,10 @@ function MiqWorkspace() {
 
   if (!user) {
     return <SignInGateway />;
+  }
+
+  if (user && !isAdmin && profile && !profile.className) {
+    return <StudentClassSetup />;
   }
 
   const activeModule =
