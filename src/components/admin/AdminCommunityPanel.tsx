@@ -97,6 +97,22 @@ export function AdminCommunityPanel({
       handleFirestoreError(err, OperationType.UPDATE, 'users/' + student.uid);
     }
   };
+  const deleteClass = async (cl: {id:string;name:string}) => {
+    const assigned = usersList.filter((student) => student.role !== 'admin' && student.active !== false && student.className === cl.name);
+    if (assigned.length > 0) {
+      window.alert('Kelas ini masih mempunyai ' + assigned.length + ' pelajar. Pindahkan pelajar ke kelas lain dahulu sebelum memadam kelas.');
+      return;
+    }
+    if (!window.confirm('Padam kelas ' + cl.name + '? Tindakan ini tidak boleh dibatalkan.')) return;
+    setAccessSaving(true);
+    try {
+      await deleteDoc(doc(db, 'classes', cl.id));
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, 'classes/' + cl.id);
+    } finally {
+      setAccessSaving(false);
+    }
+  };
   const addClass = async () => {
     if (!user || !newClassName.trim()) return;
     const name = newClassName.trim();
@@ -435,7 +451,7 @@ export function AdminCommunityPanel({
         <div className="px-5 pb-5 border-t border-slate-100 pt-4">
           <h3 className="text-sm font-semibold mb-3">Senarai kelas</h3>
           <div className="flex gap-2"><input value={newClassName} onChange={(e)=>setNewClassName(e.target.value)} placeholder="Contoh: DKA 1A" className="min-w-0 flex-1 px-3 py-2 rounded-lg border text-sm" /><button type="button" disabled={accessSaving} onClick={()=>void addClass()} className="px-4 py-2 rounded-lg bg-[#0A1128] text-white text-xs font-semibold">Tambah</button></div>
-          <div className="mt-2 grid sm:grid-cols-2 gap-x-4">{classList.map((cl)=><div key={cl.id} className="border-b py-2 text-sm">{cl.name} <span className="text-xs text-slate-400">{cl.active?'Aktif':'Tidak aktif'}</span></div>)}</div>
+          <div className="mt-2 grid sm:grid-cols-2 gap-x-4">{classList.map((cl)=><div key={cl.id} className="border-b py-2 flex items-center justify-between gap-2 text-sm"><span>{cl.name} <span className="text-xs text-slate-400">{cl.active?'Aktif':'Tidak aktif'}</span></span><button type="button" disabled={accessSaving} onClick={() => void deleteClass(cl)} className="shrink-0 px-2 py-1 rounded-md border border-red-200 text-red-700 hover:bg-red-50 text-xs font-semibold">Padam</button></div>)}</div>
         </div>
       </section>
       {/* Role Management & Users */}
