@@ -17,7 +17,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { useMiqData } from './hooks/useMiqData';
 
 function MiqWorkspace() {
-  const { user, isAdmin, authReady } = useAuth();
+  const { user, isAdmin, authReady, accessDeniedEmail, signOutUser } = useAuth();
   const {
     modules,
     submodules,
@@ -59,6 +59,24 @@ function MiqWorkspace() {
           <div className="text-sm font-medium text-slate-600">
             Memulakan ruang pembelajaran M-IQ...
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (accessDeniedEmail) {
+    return (
+      <div className="min-h-screen bg-[#F8F9FC] flex items-center justify-center p-6">
+        <div className="max-w-lg w-full rounded-2xl bg-white border border-red-200 p-8 text-center shadow-sm">
+          <div className="mx-auto mb-4 w-12 h-12 rounded-full bg-red-50 text-red-700 flex items-center justify-center text-xl font-bold">!</div>
+          <h1 className="text-xl font-bold text-slate-900 mb-2">Akses M-IQ Belum Diluluskan</h1>
+          <p className="text-sm text-slate-600 leading-relaxed mb-2">
+            Akaun Google <strong>{accessDeniedEmail}</strong> belum didaftarkan atau aksesnya telah ditarik balik oleh pentadbir.
+          </p>
+          <p className="text-sm text-slate-500 mb-6">Sila hubungi pentadbir M-IQ untuk pengesahan akses.</p>
+          <button type="button" onClick={() => void signOutUser()} className="px-5 py-2.5 rounded-lg bg-[#4C1D95] text-white text-sm font-semibold">
+            Keluar dan pilih akaun lain
+          </button>
         </div>
       </div>
     );
