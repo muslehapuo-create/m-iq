@@ -38,6 +38,17 @@ service cloud.firestore {
       );
     }
 
+    function isApprovedStudent() {
+      return isVerified()
+        && request.auth.token.email is string
+        && exists(/databases/$(database)/documents/approvedStudents/$(request.auth.token.email))
+        && get(/databases/$(database)/documents/approvedStudents/$(request.auth.token.email)).data.active == true;
+    }
+
+    function canAccessApp() {
+      return isAdmin() || isApprovedStudent();
+    }
+
     function isValidUser(data) {
       return data.keys().hasAll(['uid', 'displayName', 'email', 'photoURL', 'role', 'program', 'createdAt', 'updatedAt'])
         && data.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'role', 'program', 'createdAt', 'updatedAt'])
@@ -517,11 +528,45 @@ service cloud.firestore {
         && (!('feedbackAt' in data) || data.feedbackAt is timestamp);
     }
 
+    // Administrator-managed student approval list. Document ID is the lowercase Google email.
+    match /approvedStudents/{studentEmail} {
+      allow get: if isAdmin() || (isVerified() && request.auth.token.email == studentEmail);
+      allow list: if isAdmin();
+      allow create, update: if isAdmin()
+        && studentEmail is string
+        && studentEmail.size() >= 5
+        && studentEmail.size() <= 160
+        && incoming().keys().hasAll(['email', 'displayName', 'active', 'createdAt', 'updatedAt', 'addedBy'])
+        && incoming().keys().hasOnly(['email', 'displayName', 'active', 'createdAt', 'updatedAt', 'addedBy'])
+        && incoming().email == studentEmail
+        && incoming().displayName is string && incoming().displayName.size() <= 120
+        && incoming().active is bool
+        && incoming().createdAt is timestamp
+        && incoming().updatedAt == request.time
+        && incoming().addedBy is string && incoming().addedBy.size() <= 128;
+      allow delete: if isAdmin();
+    }
+
+    // Class list maintained by administrators; students may only read it after approval.
+    match /classes/{classId} {
+      allow get, list: if canAccessApp();
+      allow create, update: if isAdmin()
+        && isValidId(classId)
+        && incoming().keys().hasAll(['name', 'active', 'createdAt', 'updatedAt', 'createdBy'])
+        && incoming().keys().hasOnly(['name', 'active', 'createdAt', 'updatedAt', 'createdBy'])
+        && incoming().name is string && incoming().name.size() >= 1 && incoming().name.size() <= 120
+        && incoming().active is bool
+        && incoming().createdAt is timestamp
+        && incoming().updatedAt == request.time
+        && incoming().createdBy is string && incoming().createdBy.size() <= 128;
+      allow delete: if isAdmin() && isValidId(classId);
+    }
+
     // Users Collection (PII isolated to owner or admin)
     match /users/{userId} {
       allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
       allow list: if isAdmin();
-      allow create: if isVerified()
+      allow create: if canAccessApp()
         && isValidId(userId)
         && isOwner(userId)
         && isValidUser(incoming())
@@ -529,7 +574,7 @@ service cloud.firestore {
         && incoming().role == 'student'
         && incoming().createdAt == request.time
         && incoming().updatedAt == request.time;
-      allow update: if isVerified()
+      allow update: if canAccessApp()
         && isValidId(userId)
         && isValidUser(incoming())
         && incoming().uid == existing().uid
@@ -553,8 +598,8 @@ service cloud.firestore {
 
     // Modules Collection
     match /modules/{moduleId} {
-      allow get: if isValidId(moduleId) && (isAdmin() || (isSignedIn() && existing().status == 'published'));
-      allow list: if isAdmin() || (isSignedIn() && existing().status == 'published');
+      allow get: if isValidId(moduleId) && (isAdmin() || (canAccessApp() && existing().status == 'published'));
+      allow list: if isAdmin() || (canAccessApp() && existing().status == 'published');
       allow create: if isAdmin()
         && isValidId(moduleId)
         && isValidModule(incoming())
@@ -572,8 +617,8 @@ service cloud.firestore {
 
     // SubModules Collection
     match /submodules/{submoduleId} {
-      allow get: if isValidId(submoduleId) && (isAdmin() || (isSignedIn() && existing().status == 'published'));
-      allow list: if isAdmin() || (isSignedIn() && existing().status == 'published');
+      allow get: if isValidId(submoduleId) && (isAdmin() || (canAccessApp() && existing().status == 'published'));
+      allow list: if isAdmin() || (canAccessApp() && existing().status == 'published');
       allow create: if isAdmin()
         && isValidId(submoduleId)
         && isValidSubModule(incoming())
@@ -590,8 +635,8 @@ service cloud.firestore {
 
     // Topics Collection
     match /topics/{topicId} {
-      allow get: if isValidId(topicId) && (isAdmin() || (isSignedIn() && existing().status == 'published'));
-      allow list: if isAdmin() || (isSignedIn() && existing().status == 'published');
+      allow get: if isValidId(topicId) && (isAdmin() || (canAccessApp() && existing().status == 'published'));
+      allow list: if isAdmin() || (canAccessApp() && existing().status == 'published');
       allow create: if isAdmin()
         && isValidId(topicId)
         && isValidTopic(incoming())
@@ -608,8 +653,8 @@ service cloud.firestore {
 
     // Learning Resources Collection
     match /resources/{resourceId} {
-      allow get: if isValidId(resourceId) && (isAdmin() || (isSignedIn() && existing().status == 'published'));
-      allow list: if isAdmin() || (isSignedIn() && existing().status == 'published');
+      allow get: if isValidId(resourceId) && (isAdmin() || (canAccessApp() && existing().status == 'published'));
+      allow list: if isAdmin() || (canAccessApp() && existing().status == 'published');
       allow create: if isAdmin()
         && isValidId(resourceId)
         && isValidResource(incoming())
@@ -625,8 +670,8 @@ service cloud.firestore {
 
     // Checklist Items Collection (Senarai Semak Amalan Itqan 5 Fasa)
     match /checklistItems/{itemId} {
-      allow get: if isValidId(itemId) && (isAdmin() || (isSignedIn() && existing().status == 'published'));
-      allow list: if isAdmin() || (isSignedIn() && existing().status == 'published');
+      allow get: if isValidId(itemId) && (isAdmin() || (canAccessApp() && existing().status == 'published'));
+      allow list: if isAdmin() || (canAccessApp() && existing().status == 'published');
       allow create: if isAdmin()
         && isValidId(itemId)
         && isValidChecklistItem(incoming())
@@ -642,8 +687,8 @@ service cloud.firestore {
 
     // Self-Assessment Statements Collection (Skala Likert 1-5)
     match /selfAssessmentItems/{itemId} {
-      allow get: if isValidId(itemId) && (isAdmin() || (isSignedIn() && existing().status == 'published'));
-      allow list: if isAdmin() || (isSignedIn() && existing().status == 'published');
+      allow get: if isValidId(itemId) && (isAdmin() || (canAccessApp() && existing().status == 'published'));
+      allow list: if isAdmin() || (canAccessApp() && existing().status == 'published');
       allow create: if isAdmin()
         && isValidId(itemId)
         && isValidSelfAssessmentItem(incoming())
@@ -659,8 +704,8 @@ service cloud.firestore {
 
     // Assessment Scoring Configuration (Admin-managed)
     match /assessmentConfigs/{configId} {
-      allow get: if isValidId(configId) && isSignedIn();
-      allow list: if isSignedIn();
+      allow get: if isValidId(configId) && canAccessApp();
+      allow list: if canAccessApp();
       allow create: if isAdmin()
         && isValidId(configId)
         && isValidAssessmentConfig(incoming())
@@ -676,8 +721,8 @@ service cloud.firestore {
 
     // Rubric Criteria Collection (Rubrik Kualiti Tugasan)
     match /rubricCriteria/{criterionId} {
-      allow get: if isValidId(criterionId) && (isAdmin() || (isSignedIn() && existing().status == 'published'));
-      allow list: if isAdmin() || (isSignedIn() && existing().status == 'published');
+      allow get: if isValidId(criterionId) && (isAdmin() || (canAccessApp() && existing().status == 'published'));
+      allow list: if isAdmin() || (canAccessApp() && existing().status == 'published');
       allow create: if isAdmin()
         && isValidId(criterionId)
         && isValidRubricCriterion(incoming())
@@ -694,14 +739,14 @@ service cloud.firestore {
     // Student Progress Collection
     match /studentProgress/{progressId} {
       allow get: if isValidId(progressId) && (isOwner(progressId) || isAdmin());
-      allow list: if isAdmin() || (isSignedIn() && existing().userId == request.auth.uid);
-      allow create: if isVerified()
+      allow list: if isAdmin() || (canAccessApp() && existing().userId == request.auth.uid);
+      allow create: if canAccessApp()
         && isValidId(progressId)
         && isOwner(progressId)
         && isValidStudentProgress(incoming())
         && incoming().userId == request.auth.uid
         && incoming().updatedAt == request.time;
-      allow update: if isVerified()
+      allow update: if canAccessApp()
         && isValidId(progressId)
         && isValidStudentProgress(incoming())
         && incoming().userId == existing().userId
@@ -712,15 +757,15 @@ service cloud.firestore {
 
     // Student Reflections Collection
     match /reflections/{reflectionId} {
-      allow get: if isValidId(reflectionId) && isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
-      allow list: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
-      allow create: if isVerified()
+      allow get: if isValidId(reflectionId) && canAccessApp() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if canAccessApp() && (existing().userId == request.auth.uid || isAdmin());
+      allow create: if canAccessApp()
         && isValidId(reflectionId)
         && isValidReflection(incoming())
         && incoming().userId == request.auth.uid
         && incoming().createdAt == request.time
         && incoming().updatedAt == request.time;
-      allow update: if isVerified()
+      allow update: if canAccessApp()
         && isValidId(reflectionId)
         && isValidReflection(incoming())
         && existing().userId == request.auth.uid
@@ -748,14 +793,14 @@ service cloud.firestore {
           'itqanTakeaway',
           'updatedAt'
         ]);
-      allow delete: if isValidId(reflectionId) && isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow delete: if isValidId(reflectionId) && canAccessApp() && (existing().userId == request.auth.uid || isAdmin());
     }
 
     // Student Learning Activity History (Immutable log per user)
     match /studentActivities/{activityId} {
-      allow get: if isValidId(activityId) && isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
-      allow list: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
-      allow create: if isVerified()
+      allow get: if isValidId(activityId) && canAccessApp() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if canAccessApp() && (existing().userId == request.auth.uid || isAdmin());
+      allow create: if canAccessApp()
         && isValidId(activityId)
         && isValidStudentActivity(incoming())
         && incoming().userId == request.auth.uid
@@ -766,9 +811,9 @@ service cloud.firestore {
 
     // Student Feedback Collection
     match /feedback/{feedbackId} {
-      allow get: if isValidId(feedbackId) && isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
-      allow list: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
-      allow create: if isVerified()
+      allow get: if isValidId(feedbackId) && canAccessApp() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if canAccessApp() && (existing().userId == request.auth.uid || isAdmin());
+      allow create: if canAccessApp()
         && isValidId(feedbackId)
         && isValidFeedback(incoming())
         && incoming().userId == request.auth.uid
@@ -783,13 +828,13 @@ service cloud.firestore {
         && incoming().createdAt == existing().createdAt
         && incoming().updatedAt == request.time
         && incoming().diff(existing()).affectedKeys().hasOnly(['adminReply', 'status', 'updatedAt']);
-      allow delete: if isValidId(feedbackId) && (isAdmin() || (isSignedIn() && existing().userId == request.auth.uid));
+      allow delete: if isValidId(feedbackId) && (isAdmin() || (canAccessApp() && existing().userId == request.auth.uid));
     }
 
     // Non-PII Admin (Pensyarah) Directory for Student i-Temu Selection
     match /lecturerDirectory/{lecturerId} {
-      allow get: if isValidId(lecturerId) && isSignedIn();
-      allow list: if isSignedIn();
+      allow get: if isValidId(lecturerId) && canAccessApp();
+      allow list: if canAccessApp();
       allow create: if isAdmin()
         && isValidId(lecturerId)
         && isValidLecturerDirectory(incoming())
@@ -805,9 +850,9 @@ service cloud.firestore {
 
     // i-Temu Pensyarah Consultation Appointments
     match /appointments/{appointmentId} {
-      allow get: if isValidId(appointmentId) && isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
-      allow list: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
-      allow create: if isVerified()
+      allow get: if isValidId(appointmentId) && canAccessApp() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if canAccessApp() && (existing().userId == request.auth.uid || isAdmin());
+      allow create: if canAccessApp()
         && isValidId(appointmentId)
         && isValidAppointment(incoming())
         && incoming().userId == request.auth.uid
@@ -823,7 +868,7 @@ service cloud.firestore {
         && incoming().createdAt == request.time
         && incoming().updatedAt == request.time
         && !('respondedAt' in incoming());
-      allow update: if isVerified()
+      allow update: if canAccessApp()
         && isValidId(appointmentId)
         && isValidAppointment(incoming())
         && incoming().userId == existing().userId
@@ -891,15 +936,15 @@ service cloud.firestore {
         );
       allow delete: if isValidId(appointmentId) && (
         isAdmin() ||
-        (isSignedIn() && existing().userId == request.auth.uid && existing().status in ['pending', 'cancelled'])
+        (canAccessApp() && existing().userId == request.auth.uid && existing().status in ['pending', 'cancelled'])
       );
     }
 
     // i-TEMU Academic Communication & Lecturer Feedback Records
     match /itemuRecords/{recordId} {
-      allow get: if isValidId(recordId) && isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
-      allow list: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
-      allow create: if isVerified()
+      allow get: if isValidId(recordId) && canAccessApp() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if canAccessApp() && (existing().userId == request.auth.uid || isAdmin());
+      allow create: if canAccessApp()
         && isValidId(recordId)
         && isValidITemuRecord(incoming())
         && incoming().userId == request.auth.uid
@@ -917,7 +962,7 @@ service cloud.firestore {
         && incoming().createdAt == request.time
         && incoming().updatedAt == request.time
         && !('feedbackAt' in incoming());
-      allow update: if isVerified()
+      allow update: if canAccessApp()
         && isValidId(recordId)
         && isValidITemuRecord(incoming())
         && incoming().userId == existing().userId
@@ -971,7 +1016,7 @@ service cloud.firestore {
         );
       allow delete: if isValidId(recordId) && (
         isAdmin() ||
-        (isSignedIn() && existing().userId == request.auth.uid && existing().status == 'dihantar')
+        (canAccessApp() && existing().userId == request.auth.uid && existing().status == 'dihantar')
       );
     }
   }
