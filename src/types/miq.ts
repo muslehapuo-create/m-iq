@@ -50,6 +50,7 @@ export interface UserProfile {
   photoURL: string;
   role: UserRole;
   program: string;
+  className?: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
