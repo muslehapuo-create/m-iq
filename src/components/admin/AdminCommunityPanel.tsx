@@ -252,6 +252,7 @@ export function AdminCommunityPanel({
                       <td className="py-3.5 px-4">
                         <div className="font-semibold text-[#0F172A]">{u.displayName}</div>
                         <div className="text-[11px] text-slate-500">{u.email}</div>
+                        <div className="text-[11px] text-[#4C1D95]">Kelas: {u.className || "Belum dipilih"}</div>
                       </td>
                       <td className="py-3.5 px-4 tabular-nums">
                         <div className="font-semibold text-[#4C1D95]">{userTopicPct}%</div>
