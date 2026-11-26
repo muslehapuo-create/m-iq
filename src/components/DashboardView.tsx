@@ -16,6 +16,7 @@ import { useAuth } from '../context/AuthContext';
 import { HERO_BANNER_IMAGE } from '../lib/seedData';
 import {
   ITQAN_FIVE_PHASES,
+  resolveAssetUrl,
   type ActivityType,
   type AssessmentConfig,
   type ChecklistItem,
@@ -188,7 +189,7 @@ export function DashboardView({
 
         <div className="lg:col-span-5 min-h-[220px] bg-[#0A1128] relative">
           <img
-            src={HERO_BANNER_IMAGE}
+            src={resolveAssetUrl(HERO_BANNER_IMAGE)}
             alt="Suasana pembelajaran akademik M-IQ"
             referrerPolicy="no-referrer"
             className="w-full h-full object-cover"

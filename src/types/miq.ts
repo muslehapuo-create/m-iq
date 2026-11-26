@@ -608,13 +608,24 @@ export function sanitizeId(input: string): string {
 
 export function isSafeHttpUrl(rawUrl: string): boolean {
   if (!rawUrl || typeof rawUrl !== 'string') return false;
-  if (rawUrl.startsWith('/src/assets/')) return true;
+  const trimmed = rawUrl.trim();
+  if (trimmed.startsWith('/src/assets/') || trimmed.startsWith('/m-iq/src/assets/')) {
+    return true;
+  }
   try {
-    const parsed = new URL(rawUrl.trim());
+    const parsed = new URL(trimmed);
     return parsed.protocol === 'https:' || parsed.protocol === 'http:';
   } catch {
     return false;
   }
+}
+
+export function resolveAssetUrl(rawUrl: string): string {
+  if (!rawUrl || typeof rawUrl !== 'string') return '';
+  const trimmed = rawUrl.trim();
+  if (!trimmed.startsWith('/src/assets/')) return trimmed;
+  const basePrefix = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+  return basePrefix ? `${basePrefix}${trimmed}` : trimmed;
 }
 
 export function extractYoutubeId(rawUrl: string): string | null {

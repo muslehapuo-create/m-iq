@@ -22,6 +22,7 @@ import {
   extractYoutubeId,
   formatBytes,
   isSafeHttpUrl,
+  resolveAssetUrl,
   type LearningModule,
   type LearningResource,
   type StudentProgress,
@@ -146,9 +147,9 @@ export function ModuleLearningView({
     }
   };
 
-  const coverUrl = isSafeHttpUrl(module.coverImageUrl)
-    ? module.coverImageUrl
-    : MODULE_COVER_IMAGE;
+  const coverUrl = resolveAssetUrl(
+    isSafeHttpUrl(module.coverImageUrl) ? module.coverImageUrl : MODULE_COVER_IMAGE
+  );
 
   return (
     <div className="space-y-6">
@@ -435,7 +436,7 @@ export function ModuleLearningView({
                             className="rounded-lg overflow-hidden border border-slate-200 bg-slate-50"
                           >
                             <img
-                              src={img.url}
+                              src={resolveAssetUrl(img.url)}
                               alt={img.name}
                               referrerPolicy="no-referrer"
                               className="w-full max-h-[760px] object-contain bg-white"
@@ -446,7 +447,7 @@ export function ModuleLearningView({
                                 {img.name}
                               </span>
                               <a
-                                href={img.url}
+                                href={resolveAssetUrl(img.url)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1 text-xs font-semibold text-[#4C1D95] hover:underline shrink-0"
@@ -469,7 +470,7 @@ export function ModuleLearningView({
                         .map((docItem, i) => (
                           <a
                             key={i}
-                            href={docItem.url}
+                            href={resolveAssetUrl(docItem.url)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center justify-between gap-3 p-3.5 rounded-lg border border-slate-200 hover:border-[#4C1D95]/50 bg-[#F8F9FC] transition-colors"
@@ -613,7 +614,7 @@ export function ModuleLearningView({
               return (
                 <a
                   key={res.id}
-                  href={res.url}
+                  href={resolveAssetUrl(res.url)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="p-4 rounded-lg border border-slate-200 hover:border-[#4C1D95]/50 transition-colors flex flex-col justify-between gap-3"

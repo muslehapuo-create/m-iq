@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { CREST_EMBLEM_IMAGE } from '../lib/seedData';
-import type { LearningModule } from '../types/miq';
+import { resolveAssetUrl, type LearningModule } from '../types/miq';
 import { IRefleksiIcon } from './IRefleksiIcon';
 
 interface NavigationSidebarProps {
@@ -73,7 +73,7 @@ export function NavigationSidebar({
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-9 h-9 rounded-lg overflow-hidden border border-[#C59B27]/50 shrink-0 bg-[#0F172A]">
             <img
-              src={CREST_EMBLEM_IMAGE}
+              src={resolveAssetUrl(CREST_EMBLEM_IMAGE)}
               alt="M-IQ"
               referrerPolicy="no-referrer"
               className="w-full h-full object-cover"

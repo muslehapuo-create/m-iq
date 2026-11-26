@@ -4,6 +4,7 @@ import {
   getTopicFontClass,
   getTopicFontSizeClass,
   isSafeHttpUrl,
+  resolveAssetUrl,
   type TopicStyle,
 } from '../types/miq';
 
@@ -214,7 +215,7 @@ function domNodeToReact(node: ChildNode, key: string): React.ReactNode {
       return (
         <a
           key={key}
-          href={href}
+          href={resolveAssetUrl(href)}
           target="_blank"
           rel="noopener noreferrer"
           style={safeStyle}
@@ -231,7 +232,7 @@ function domNodeToReact(node: ChildNode, key: string): React.ReactNode {
       return (
         <img
           key={key}
-          src={src}
+          src={resolveAssetUrl(src)}
           alt={alt}
           referrerPolicy="no-referrer"
           className="max-w-full h-auto rounded-lg border border-slate-200 my-3"

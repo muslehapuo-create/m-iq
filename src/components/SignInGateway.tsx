@@ -1,6 +1,7 @@
 import { ArrowRight, BookOpen, CheckSquare, Compass, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { CORE_MODULES_BLUEPRINT, CREST_EMBLEM_IMAGE, HERO_BANNER_IMAGE } from '../lib/seedData';
+import { resolveAssetUrl } from '../types/miq';
 
 export function SignInGateway() {
   const { signInWithGoogle, signingIn, authError } = useAuth();
@@ -12,7 +13,7 @@ export function SignInGateway() {
         <div className="flex items-center gap-3 shrink-0">
           <div className="w-9 h-9 rounded-lg overflow-hidden bg-[#0A1128] border border-[#C59B27]/40 shrink-0">
             <img
-              src={CREST_EMBLEM_IMAGE}
+              src={resolveAssetUrl(CREST_EMBLEM_IMAGE)}
               alt="Lambang M-IQ"
               referrerPolicy="no-referrer"
               className="w-full h-full object-cover"
@@ -113,7 +114,7 @@ export function SignInGateway() {
           <div className="lg:col-span-6">
             <div className="h-full min-h-[320px] rounded-xl overflow-hidden border border-slate-200 bg-[#0A1128] relative">
               <img
-                src={HERO_BANNER_IMAGE}
+                src={resolveAssetUrl(HERO_BANNER_IMAGE)}
                 alt="Perpustakaan moden berteraskan seni bina Islam kontemporari"
                 referrerPolicy="no-referrer"
                 className="w-full h-full object-cover"
