@@ -34,6 +34,7 @@ interface AuthContextValue {
   signInWithGoogle: () => Promise<void>;
   signOutUser: () => Promise<void>;
   updateProgram: (program: string) => Promise<void>;
+  accessDeniedEmail: string | null;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -45,15 +46,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authReady, setAuthReady] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [accessDeniedEmail, setAccessDeniedEmail] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
+      setUser(null);
+      setAccessDeniedEmail(null);
       setAuthError(null);
 
       if (!firebaseUser) {
         setProfile(null);
         setIsAdmin(false);
+        setAccessDeniedEmail(null);
         setAuthReady(true);
         return;
       }
@@ -74,6 +78,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         const resolvedAdmin = Boolean(isPrimaryAdmin || adminGrantExists);
+        const safeEmail = (firebaseUser.email || '').trim().toLowerCase().slice(0, 160);
+
+        if (!resolvedAdmin) {
+          if (!firebaseUser.emailVerified || !safeEmail) {
+            setAccessDeniedEmail(firebaseUser.email || 'Akaun Google tidak disahkan');
+            setProfile(null);
+            setIsAdmin(false);
+            return;
+          }
+          const approvalSnap = await getDoc(doc(db, 'approvedStudents', safeEmail));
+          if (!approvalSnap.exists() || approvalSnap.data().active !== true) {
+            setAccessDeniedEmail(safeEmail);
+            setProfile(null);
+            setIsAdmin(false);
+            return;
+          }
+        }
+
+        setUser(firebaseUser);
         setIsAdmin(resolvedAdmin);
 
         const userRef = doc(db, 'users', firebaseUser.uid);
@@ -85,14 +108,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         const safeName = (firebaseUser.displayName || 'Pelajar Politeknik').slice(0, 120);
-        const safeEmail = (firebaseUser.email || '').slice(0, 160);
+        const profileEmail = (firebaseUser.email || '').slice(0, 160);
         const safePhoto = (firebaseUser.photoURL || '').slice(0, 500);
 
         if (!userSnap.exists()) {
           const initialPayload = {
             uid: firebaseUser.uid,
             displayName: safeName,
-            email: safeEmail,
+            email: profileEmail,
             photoURL: safePhoto,
             role: 'student' as const,
             program: 'Politeknik Malaysia',
@@ -119,7 +142,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setProfile({
             uid: firebaseUser.uid,
             displayName: safeName,
-            email: safeEmail,
+            email: profileEmail,
             photoURL: safePhoto,
             role: resolvedAdmin ? 'admin' : 'student',
             program: 'Politeknik Malaysia',
@@ -233,6 +256,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         authReady,
         signingIn,
         authError,
+        accessDeniedEmail,
         signInWithGoogle,
         signOutUser,
         updateProgram,
